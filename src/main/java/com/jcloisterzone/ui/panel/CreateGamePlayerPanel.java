@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import com.jcloisterzone.Expansion;
 import com.jcloisterzone.ai.legacyplayer.LegacyAiPlayer;
+import com.jcloisterzone.ai.mmplayer.MiniMaxAiPlayer;
 import com.jcloisterzone.game.PlayerSlot;
 import com.jcloisterzone.game.PlayerSlot.SlotType;
 import com.jcloisterzone.ui.Client;
@@ -156,6 +157,10 @@ public class CreateGamePlayerPanel extends JPanel {
                 status.setText(_("Computer player"));
                 updateIcon("ai", color, false);
                 break;
+            case MM_AI:
+            	status.setText(_("Hard Computer Player"));
+            	updateIcon("ai", color, true);
+                break;
         }
         nickname.setText(slot.getNick());
     }
@@ -185,6 +190,11 @@ public class CreateGamePlayerPanel extends JPanel {
                 status.setText(_("Computer player"));
                 //updateIcon("ai", color, slot.getOwner() == clientId);
                 updateIcon("ai", color, true);
+                updateNickname(false);
+                break;
+            case MM_AI:
+            	status.setText(_("Hard Computer Player"));
+            	updateIcon("ai", color, true);
                 updateNickname(false);
                 break;
         }
@@ -224,10 +234,19 @@ public class CreateGamePlayerPanel extends JPanel {
                 slot.setNick(nick);
                 nickname.setText(nick);
                 break;
-            case AI: //-> OPEN
+            case AI: //-> MM_AI
+                //nameProvider.releaseName(SlotType.AI, slot.getNumber());
+                slot.setType(SlotType.MM_AI);
+                slot.setAiClassName(MiniMaxAiPlayer.class.getName());
+                supported = MiniMaxAiPlayer.supportedExpansions();
+                //nick = nameProvider.reserveName(SlotType.AI, slot.getNumber());
+                //slot.setNick(nick);
+                //nickname.setText(nick);
+                break;
+            case MM_AI: // -> OPEN
                 nameProvider.releaseName(SlotType.AI, slot.getNumber());
                 slot.setType(SlotType.OPEN);
-                break;
+                break;            	
             default:
                 return;
             }

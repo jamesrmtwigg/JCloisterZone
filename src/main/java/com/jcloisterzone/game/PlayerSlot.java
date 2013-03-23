@@ -8,7 +8,7 @@ public class PlayerSlot implements Serializable {
 
 	public static final int COUNT = 6;
 
-	public enum SlotType { PLAYER, AI, OPEN }
+	public enum SlotType { PLAYER, AI, MM_AI, OPEN }
 
 	private final int number;
 	private SlotType type = SlotType.OPEN;
@@ -58,7 +58,8 @@ public class PlayerSlot implements Serializable {
 	}
 
 	public boolean isOccupied() {
-		return type == SlotType.PLAYER || type == SlotType.AI;
+		//return type == SlotType.PLAYER || type == SlotType.AI;
+		return type != SlotType.OPEN;
 	}
 
 	public String getAiClassName() {
