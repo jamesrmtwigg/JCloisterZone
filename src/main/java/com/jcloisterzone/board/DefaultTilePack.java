@@ -2,6 +2,7 @@ package com.jcloisterzone.board;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -172,6 +173,18 @@ public class DefaultTilePack implements TilePack {
         return groups.keySet();
     }
 
+    /**
+     * TODO: want to order groups from largest to smallest. Use a list of tuples instead of a map?
+     */
+    public Map<String, Integer> getGroupSizes() {
+    	Map<String, Integer> groupSizes = new LinkedHashMap<String, Integer>(groups.size()+1, 1.0f);
+    	for(String group : groups.keySet())
+    	{
+    		groupSizes.put(group, groups.get(group).size());
+    	}
+    	return groupSizes;
+    }
+    
     /* special Abbey related methods - refactor je to jen kvuli klientovi */
     @Override
     public Tile getAbbeyTile() {

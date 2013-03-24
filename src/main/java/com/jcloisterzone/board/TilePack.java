@@ -1,5 +1,6 @@
 package com.jcloisterzone.board;
 
+import java.util.Map;
 import java.util.Set;
 
 public interface TilePack {
@@ -21,6 +22,7 @@ public interface TilePack {
     void deactivateGroup(String group);
     boolean isGroupActive(String group);
     Set<String> getGroups();
+    Map<String, Integer> getGroupSizes();
 
     int getSizeForEdgePattern(EdgePattern edgePattern);
 }
