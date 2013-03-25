@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.Stack;
 
 import com.jcloisterzone.Expansion;
+import com.jcloisterzone.Player;
 import com.jcloisterzone.ai.PositionRanking;
 import com.jcloisterzone.ai.SavePointManager;
 import com.jcloisterzone.ai.copy.CopyGamePhase;
@@ -16,6 +17,7 @@ import com.jcloisterzone.board.Position;
 import com.jcloisterzone.event.GameEventAdapter;
 import com.jcloisterzone.game.Game;
 import com.jcloisterzone.game.Snapshot;
+import com.jcloisterzone.game.phase.GameOverPhase;
 import com.jcloisterzone.game.phase.Phase;
 
 public class MiniMaxAiPlayer extends LegacyAiPlayer
@@ -38,6 +40,8 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
 		throw new UnsupportedOperationException("This AI player supports only the basic game.");
 	}
    
+    
+    
     /*public Game getGame()
     {
     	return gameStack.peek();
@@ -71,6 +75,19 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
         setGame(gameStack.pop());
     }
     
+    private double rankLeaf()
+    {
+    	Game game = gameStack.isEmpty() ? getGame() : gameStack.peek();
+		Phase gop = game.getPhases().get(GameOverPhase.class); 
+		gop.enter();
+		Player winner = game.getActivePlayer();
+		for(Player p : game.getAllPlayers())
+		{
+			if(p.getPoints() > winner.getPoints()) winner = p;
+		}
+		return winner == this.getPlayer() ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;
+    }
+    
     private static String[] sortKeysByValueDescending(final Map<String, Integer> map) {
     	String[] ids = (String[])map.keySet().toArray();
     	Arrays.sort(ids, new Comparator<String>()
@@ -92,7 +109,14 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
      */
     private double negamax(double alpha, double beta, int depth)
     {
-    	//TODO: if a leaf (end of game) or depth == 0 return rank
+    	if(packSize < 1)
+    	{
+    		return rankLeaf();
+    	}
+    	if(depth == 0)
+    	{
+    		return rank();
+    	}
     	double score = Double.NEGATIVE_INFINITY;
     	
     	//for each possible move{
@@ -122,7 +146,15 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     }
     
     private double star25(double alpha, double beta, int depth) {
-    	//TODO: if leaf (game is over) or depth == 0 return rank 
+    	if(packSize < 1)
+    	{
+    		return rankLeaf();
+    	}
+    	if(depth == 0)
+    	{
+    		return rank();
+    	}
+    	
     	double cur_x = 0;
     	double cur_y = 1;
     	double cur_w = 0;
