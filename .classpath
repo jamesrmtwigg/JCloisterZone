@@ -7,5 +7,14 @@
 	<classpathentry kind="con" path="org.eclipse.m2e.MAVEN2_CLASSPATH_CONTAINER"/>
 	<classpathentry kind="lib" path="src/test/resources"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/apple"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/google_collections"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/ini4j"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/junit"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/log4j"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/miginfocom"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/mina"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/slf4j"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/xnap"/>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>

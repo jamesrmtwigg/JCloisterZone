@@ -173,9 +173,6 @@ public class DefaultTilePack implements TilePack {
         return groups.keySet();
     }
 
-    /**
-     * TODO: want to order groups from largest to smallest. Use a list of tuples instead of a map?
-     */
     public Map<String, Integer> getGroupSizes() {
     	Map<String, Integer> groupSizes = new LinkedHashMap<String, Integer>(groups.size()+1, 1.0f);
     	for(String group : groups.keySet())

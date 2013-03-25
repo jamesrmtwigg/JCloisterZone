@@ -1,18 +1,32 @@
 package com.jcloisterzone.ai.mmplayer;
 
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.Stack;
 
 import com.jcloisterzone.Expansion;
+import com.jcloisterzone.ai.PositionRanking;
+import com.jcloisterzone.ai.SavePointManager;
+import com.jcloisterzone.ai.copy.CopyGamePhase;
 import com.jcloisterzone.ai.legacyplayer.LegacyAiPlayer;
 import com.jcloisterzone.board.Position;
+import com.jcloisterzone.event.GameEventAdapter;
+import com.jcloisterzone.game.Game;
+import com.jcloisterzone.game.Snapshot;
+import com.jcloisterzone.game.phase.Phase;
 
 public class MiniMaxAiPlayer extends LegacyAiPlayer
 {	
 	//TODO: What are the upper and lower bounds on the rank function?
 	private static final double U = 100;
 	private static final double L = -100;
+	
+	private Stack<Game> gameStack = new Stack<Game>();
+	private SavePointManager spm;
+	private PositionRanking bestSoFar;
 	
 	public static EnumSet<Expansion> supportedExpansions() {
         return EnumSet.of(
@@ -24,6 +38,55 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
 		throw new UnsupportedOperationException("This AI player supports only the basic game.");
 	}
    
+    /*public Game getGame()
+    {
+    	return gameStack.peek();
+    }*/
+    
+    private void backupGame()
+    {
+    	
+        gameStack.push(getGame());
+
+        Snapshot snapshot = new Snapshot(getGame(), 0);
+        Game gameCopy = snapshot.asGame();
+        gameCopy.setConfig(getGame().getConfig());
+        gameCopy.addGameListener(new GameEventAdapter());
+        gameCopy.addUserInterface(this);
+        Phase phase = new CopyGamePhase(gameCopy, snapshot, getGame().getTilePack());
+        gameCopy.getPhases().put(phase.getClass(), phase);
+        gameCopy.setPhase(phase);
+        phase.startGame();
+        setGame(gameCopy);
+
+        spm = new SavePointManager(getGame());
+        bestSoFar = new PositionRanking(Double.NEGATIVE_INFINITY);
+        spm.startRecording();
+    }
+    
+    private void restoreGame() {
+        assert !gameStack.isEmpty();
+        spm.stopRecording();
+        spm = null;
+        setGame(gameStack.pop());
+    }
+    
+    private static String[] sortKeysByValueDescending(final Map<String, Integer> map) {
+    	String[] ids = (String[])map.keySet().toArray();
+    	Arrays.sort(ids, new Comparator<String>()
+		{
+
+			@Override
+			public int compare(String o1, String o2)
+			{
+				return map.get(o2) - map.get(o1);
+			}
+    		
+		});
+    	
+    	return ids;
+    }
+    
     /*
      * For a tile, consider the possible moves.
      */
@@ -31,6 +94,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     {
     	//TODO: if a leaf (end of game) or depth == 0 return rank
     	double score = Double.NEGATIVE_INFINITY;
+    	
     	//for each possible move{
     		//do move
     		double value = -star25(alpha, beta, depth-1);
@@ -73,8 +137,9 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	
     	double ax = Math.max(L, cur_alpha);
     	//probing phase
-    	for(String tileId : tileGroupSizes.keySet())
+    	for(String tileId : sortKeysByValueDescending(tileGroupSizes))
     	{
+    		if(tileGroupSizes.get(tileId) < 1) break;
     		probability = (double)tileGroupSizes.get(tileId)/(double)packSize;
     		cur_y -= probability;
     		cur_beta = (beta - L*cur_y - cur_x)/probability;
@@ -89,7 +154,8 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	}
     	
     	//star1 search phase
-    	for (String tileId : tileGroupSizes.keySet()){
+    	for (String tileId : sortKeysByValueDescending(tileGroupSizes)){
+    		if(tileGroupSizes.get(tileId) < 1) break;
     		probability = (double)tileGroupSizes.get(tileId)/(double)packSize;
     		cur_y -= probability;
     		cur_alpha = (alpha-cur_x-cur_w)/probability;
