@@ -52,7 +52,7 @@ public abstract class RankingAiPlayer extends AiPlayer {
 
     /* TEMPORARY COPIED FROM CLIENT STUB */
     @Deprecated
-    private void phaseLoop() {
+	protected void phaseLoop() {
         Phase phase = getGame().getPhase();
         while(! phase.isEntered()) {
             //logger.info("  * not entered {} -> {}", phase, phase.getDefaultNext());

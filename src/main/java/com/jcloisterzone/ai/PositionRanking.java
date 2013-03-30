@@ -6,7 +6,7 @@ import com.jcloisterzone.board.Location;
 import com.jcloisterzone.board.Position;
 import com.jcloisterzone.board.Rotation;
 
-public class PositionRanking {
+public class PositionRanking implements Comparable<PositionRanking>{
 
 	private double rank;
 
@@ -87,6 +87,13 @@ public class PositionRanking {
 			sb.append(" ALoc:").append(actionLocation);
 		}
 		return sb.toString();
+	}
+
+	@Override
+	public int compareTo(PositionRanking o)
+	{
+		//Observe that PositionRankings are ordered in DESCENDING order by rank
+		return Double.compare(o.getRank(), this.getRank());
 	}
 
 
