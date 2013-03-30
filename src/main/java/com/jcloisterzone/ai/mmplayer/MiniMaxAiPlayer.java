@@ -1,5 +1,6 @@
 package com.jcloisterzone.ai.mmplayer;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -13,7 +14,9 @@ import com.jcloisterzone.ai.PositionRanking;
 import com.jcloisterzone.ai.SavePointManager;
 import com.jcloisterzone.ai.copy.CopyGamePhase;
 import com.jcloisterzone.ai.legacyplayer.LegacyAiPlayer;
+import com.jcloisterzone.board.DefaultTilePack;
 import com.jcloisterzone.board.Position;
+import com.jcloisterzone.board.Tile;
 import com.jcloisterzone.event.GameEventAdapter;
 import com.jcloisterzone.game.Game;
 import com.jcloisterzone.game.Snapshot;
@@ -88,7 +91,18 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
 		return winner == this.getPlayer() ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;
     }
     
-    private static String[] sortKeysByValueDescending(final Map<String, Integer> map) {
+    private void setCurrentTile(String tileId)
+    {
+    	getGame().setCurrentTile(getGame().getTilePack().drawTile(tileId));
+    }
+    
+    private void unsetCurrentTile()
+    {
+    	Tile t = getGame().getCurrentTile();
+    	((DefaultTilePack)getGame().getTilePack()).addTile(t, "default");
+    }
+    
+    private static String[] sortKeysByValueDescending(final Map<String, ArrayList<Tile>> map) {
     	String[] ids = (String[])map.keySet().toArray();
     	Arrays.sort(ids, new Comparator<String>()
 		{
@@ -96,7 +110,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
 			@Override
 			public int compare(String o1, String o2)
 			{
-				return map.get(o2) - map.get(o1);
+				return map.get(o2).size() - map.get(o1).size();
 			}
     		
 		});
@@ -163,44 +177,47 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	double bx;
     	double value;
     	
-    	Map<String, Integer> tileGroupSizes = getGame().getTilePack().getGroupSizes();
-    	double firstProb = (double)tileGroupSizes.entrySet().iterator().next().getValue()/(double)packSize;
+    	Map<String, ArrayList<Tile>> tileTypes = getGame().getTilePack().getTilesRemaining();
+    	String[] tileIDs = sortKeysByValueDescending(tileTypes);
+    	double firstProb = (double)tileTypes.get(tileIDs[0]).size()/(double)packSize; 
     	double cur_alpha = (alpha - (U*(1.0 - firstProb)))/firstProb;
     	
     	double ax = Math.max(L, cur_alpha);
     	//probing phase
-    	for(String tileId : sortKeysByValueDescending(tileGroupSizes))
+    	for(String tileId : tileIDs)
     	{
-    		if(tileGroupSizes.get(tileId) < 1) break;
-    		probability = (double)tileGroupSizes.get(tileId)/(double)packSize;
+    		if(tileTypes.get(tileId).isEmpty()) break;
+    		probability = (double)tileTypes.get(tileId).size()/(double)packSize;
     		cur_y -= probability;
     		cur_beta = (beta - L*cur_y - cur_x)/probability;
     		bx = Math.max(U, cur_beta);
-    		//setNextTileInGame(tileId); //that is, the next tile which we consider as a possibility to be drawn from the box.
+    		//the next tile which we consider as a possibility to be drawn from the box.
+    		setCurrentTile(tileId);
     		int probingFactor = 2;//TODO: choose the probing factor more intelligently?
     		value = nProbe(ax, bx, depth, probingFactor);
-    		//undoSetNextTile();
+    		unsetCurrentTile();
+    		
     		cur_w += value;
     		if(value >= cur_beta) return beta;
     		cur_x += probability*value;
     	}
     	
     	//star1 search phase
-    	for (String tileId : sortKeysByValueDescending(tileGroupSizes)){
-    		if(tileGroupSizes.get(tileId) < 1) break;
-    		probability = (double)tileGroupSizes.get(tileId)/(double)packSize;
+    	for (String tileId : tileIDs){
+    		if(tileTypes.get(tileId).isEmpty()) break;
+    		probability = (double)tileTypes.get(tileId).size()/(double)packSize;
     		cur_y -= probability;
     		cur_alpha = (alpha-cur_x-cur_w)/probability;
     		cur_beta = (beta-cur_x-L*cur_y)/probability;
     		ax = Math.max(L, cur_alpha);
     		bx = Math.max(U, cur_beta);
-    		//setNextTileInGame(newTile);
+    		setCurrentTile(tileId);
     		value = negamax(ax, bx, depth);
-    		//undoSetNextTile();
+    		unsetCurrentTile();
     		if (value >=cur_beta) return beta;
     		if (value <= cur_alpha) return alpha;
     		cur_x += probability * value;
-    		}
+    	}
     		return cur_x;
 
     }

@@ -173,13 +173,25 @@ public class DefaultTilePack implements TilePack {
         return groups.keySet();
     }
 
-    public Map<String, Integer> getGroupSizes() {
-    	Map<String, Integer> groupSizes = new LinkedHashMap<String, Integer>(groups.size()+1, 1.0f);
-    	for(String group : groups.keySet())
+    public Map<String, ArrayList<Tile>> getTilesRemaining() {
+    	Map<String, ArrayList<Tile>> tiles = new LinkedHashMap<String, ArrayList<Tile>>();
+    	for(ArrayList<Tile> group : groups.values())
     	{
-    		groupSizes.put(group, groups.get(group).size());
+    		for(Tile tile : group)
+    		{
+    			if(! tiles.containsKey(tile.getId()))
+    			{
+    				ArrayList<Tile> t = new ArrayList<Tile>();
+    				t.add(tile);
+    				tiles.put(tile.getId(), t);
+    			}
+    			else
+    			{
+    				tiles.get(tile.getId()).add(tile);
+    			}
+    		}
     	}
-    	return groupSizes;
+    	return tiles;
     }
     
     /* special Abbey related methods - refactor je to jen kvuli klientovi */
