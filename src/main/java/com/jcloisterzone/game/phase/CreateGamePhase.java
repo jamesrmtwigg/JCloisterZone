@@ -173,7 +173,7 @@ public class CreateGamePhase extends ServerAwarePhase {
 
     protected void prepareAiPlayers() {
         for (PlayerSlot slot : slots) {
-            if (slot != null && slot.getType() == SlotType.AI && isLocalSlot(slot)) {
+            if (slot != null && PlayerSlot.isAi(slot.getType()) && isLocalSlot(slot)) {
                 try {
                     AiPlayer ai = (AiPlayer) Class.forName(slot.getAiClassName()).newInstance();
                     ai.setGame(game);

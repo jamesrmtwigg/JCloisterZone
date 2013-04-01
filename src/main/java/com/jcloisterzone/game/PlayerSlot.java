@@ -10,6 +10,15 @@ public class PlayerSlot implements Serializable {
 
 	public enum SlotType { PLAYER, AI, MM_AI, OPEN }
 
+	public static boolean isAi(SlotType type){
+		switch (type) {
+			case AI:
+			case MM_AI:
+				return true
+		}
+		return false;
+	}
+
 	private final int number;
 	private SlotType type = SlotType.OPEN;
 	private String nick;
