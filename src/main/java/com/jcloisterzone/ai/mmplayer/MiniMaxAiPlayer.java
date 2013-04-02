@@ -5,6 +5,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -28,6 +30,8 @@ import com.jcloisterzone.board.Position;
 import com.jcloisterzone.board.Rotation;
 import com.jcloisterzone.board.Tile;
 import com.jcloisterzone.event.GameEventAdapter;
+import com.jcloisterzone.feature.score.ScoreAllCallback;
+import com.jcloisterzone.feature.score.ScoreAllFeatureFinder;
 import com.jcloisterzone.figure.SmallFollower;
 import com.jcloisterzone.game.Game;
 import com.jcloisterzone.game.Snapshot;
@@ -112,15 +116,9 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     
     private double rankLeaf()
     {
-    	Game game = gameStack.isEmpty() ? getGame() : gameStack.peek();
-		Phase gop = game.getPhases().get(GameOverPhase.class); 
-		gop.enter();
-		Player winner = game.getActivePlayer();
-		for(Player p : game.getAllPlayers())
-		{
-			if(p.getPoints() > winner.getPoints()) winner = p;
-		}
-		return winner == this.getPlayer() ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;
+    	MiniMaxAiScoreAllCallback callback = new MiniMaxAiScoreAllCallback();
+		new ScoreAllFeatureFinder().scoreAll(getGame(), callback);
+		return callback.getRanking();
     }
     
     private void setCurrentTile(String tileId)
@@ -135,7 +133,12 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     }
     
     private static String[] sortKeysByValueDescending(final Map<String, ArrayList<Tile>> map) {
-    	String[] ids = (String[])map.keySet().toArray();
+    	Object[] values = map.keySet().toArray();
+    	String[] ids = new String[values.length];
+    	for(int i = 0; i < values.length; ++i)
+    	{
+    		ids[i] = (String)values[i];
+    	}
     	Arrays.sort(ids, new Comparator<String>()
 		{
 
@@ -152,18 +155,28 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     
     private void doMove(PositionRanking move)
     {
-    	saveStack.push(spm.save());
-    	getGame().getPhase().next(TilePhase.class);
+    	/*if(spm == null)
+    	{
+    		spm = new SavePointManager(getGame());
+    		spm.startRecording();
+    	}
+    	saveStack.push(spm.save());*/
+    	backupGame();
+    	if(!(getGame().getPhase() instanceof TilePhase))
+    	{
+    		getGame().getPhase().next(TilePhase.class);
+    	}
     	phaseLoop();
     	
     	getGame().getPhase().placeTile(move.getRotation(), move.getPosition());
     	
-    	if( ! (getGame().getPhase() instanceof ActionPhase))
-    	{
-    		getGame().getPhase().next(ActionPhase.class);
-    	}
+    	
     	if(move.getAction() != null)
     	{
+    		if( ! (getGame().getPhase() instanceof ActionPhase))
+        	{
+        		getGame().getPhase().next(ActionPhase.class);
+        	}
     		assert move.getAction() instanceof MeepleAction;
     		getGame().getPhase().deployMeeple(move.getActionPosition(), move.getActionLocation(), SmallFollower.class);
     	}
@@ -171,12 +184,25 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     
     private void undoMove()
     {
-    	spm.restore(saveStack.pop());
+    	//spm.restore(saveStack.pop());
+    	restoreGame();
     }
     
     protected void selectTilePlacement(TilePlacementAction action) {
-        //Map<Position, Set<Rotation>> placements = action.getAvailablePlacements();
-        star25(UPPER_BOUND, LOWER_BOUND, DEFAULT_MINIMAX_DEPTH);
+        TreeSet<PositionRanking> moves = getPossibleMoves(action);
+        bestSoFar = new PositionRanking(Double.NEGATIVE_INFINITY);
+        double best = Double.NEGATIVE_INFINITY;
+        for(PositionRanking move : moves)
+        {
+        	doMove(move);
+        	double currRank = star25(UPPER_BOUND, LOWER_BOUND, DEFAULT_MINIMAX_DEPTH);
+        	undoMove();
+        	if(currRank > best)
+        	{
+        		best = currRank;
+        		bestSoFar = move;
+        	}
+        }
         getServer().placeTile(getBestSoFar().getRotation(), getBestSoFar().getPosition());
     }
     
@@ -191,6 +217,10 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
             for(Rotation rot : entry.getValue()) {
                 //logger.info("  * phase {} -> {}", getGame().getPhase(), getGame().getPhase().getDefaultNext());
                 //logger.info("  * placing {} {}", pos, rot);
+            	if(!(getGame().getPhase() instanceof TilePhase))
+            	{
+            		getGame().getPhase().next(TilePhase.class);
+            	}
                 getGame().getPhase().placeTile(rot, pos);
                 //logger.info("  * phase {} -> {}", getGame().getPhase(), getGame().getPhase().getDefaultNext());
                 //getGame().getPhase().next();
@@ -252,10 +282,16 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	}
     }
     
+    private TreeSet<PositionRanking> getPossibleMoves(TilePlacementAction action)
+    {
+    	return rankMoves(action.getAvailablePlacements());
+    }
+    
     private TreeSet<PositionRanking> getPossibleMoves()
     {
-    	Map<Position, Set<Rotation>> placements = getGame().getBoard().getAvailablePlacements();
-    	return rankMoves(placements);
+    	Tile t = getGame().getCurrentTile();
+    	getGame().getBoard().refreshAvailablePlacements(t);
+    	return rankMoves(getGame().getBoard().getAvailablePlacements());
     }
     
     /*
@@ -400,5 +436,18 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     {
     	if( ! moveStack.isEmpty()) moveStack.pop();
     	moveStack.push(move);
+    }
+    
+    class MiniMaxAiScoreAllCallback extends LegacyAiScoreAllCallback
+    {
+    	public double getRanking()
+    	{
+    		double rank = super.getRanking();
+    		if(packSize < 1)
+    		{
+    			return ((currentPlayer == getPlayer()) == (rank > 0)) ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;
+    		}
+    		return rank;
+    	}
     }
 }

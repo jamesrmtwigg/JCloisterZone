@@ -127,7 +127,7 @@ public class LegacyAiPlayer extends RankingAiPlayer {
         return rating;
     }
 
-    class LegacyAiScoreAllCallback implements ScoreAllCallback {
+    protected class LegacyAiScoreAllCallback implements ScoreAllCallback {
 
         private double rank = 0;
 
