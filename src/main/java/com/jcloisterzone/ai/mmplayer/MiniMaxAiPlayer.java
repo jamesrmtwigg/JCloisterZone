@@ -2,12 +2,14 @@ package com.jcloisterzone.ai.mmplayer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
-import java.util.Map.Entry;
 import java.util.TreeSet;
 
 import com.jcloisterzone.Expansion;
@@ -26,13 +28,13 @@ import com.jcloisterzone.board.Position;
 import com.jcloisterzone.board.Rotation;
 import com.jcloisterzone.board.Tile;
 import com.jcloisterzone.event.GameEventAdapter;
-import com.jcloisterzone.figure.Follower;
-import com.jcloisterzone.figure.Meeple;
 import com.jcloisterzone.figure.SmallFollower;
 import com.jcloisterzone.game.Game;
 import com.jcloisterzone.game.Snapshot;
+import com.jcloisterzone.game.phase.ActionPhase;
 import com.jcloisterzone.game.phase.GameOverPhase;
 import com.jcloisterzone.game.phase.Phase;
+import com.jcloisterzone.game.phase.TilePhase;
 
 public class MiniMaxAiPlayer extends LegacyAiPlayer
 {	
@@ -41,10 +43,12 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
 	private static final double L = -100;
 	
 	private Stack<Game> gameStack = new Stack<Game>();
+	private Stack<SavePoint> saveStack = new Stack<SavePoint>();
 	private SavePointManager spm;
-	private PositionRanking bestSoFar;
 	
 	private Player currentPlayer = getPlayer();
+	
+	private ArrayList<TreeSet<PositionRanking>> moveSets = new ArrayList<TreeSet<PositionRanking>>(10);
 	
 	public static EnumSet<Expansion> supportedExpansions() {
         return EnumSet.of(
@@ -56,6 +60,15 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
 		throw new UnsupportedOperationException("This AI player supports only the basic game.");
 	}
    
+    private Player getCurrentPlayer()
+    {
+    	if(this.currentPlayer == null)
+    	{
+    		this.currentPlayer = getPlayer();
+    	}
+    	return currentPlayer;
+    }
+    
     private void swapCurrentPlayer()
     {
     	Player[] players = getGame().getAllPlayers();
@@ -138,11 +151,33 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     private void doMove(PositionRanking move)
     {
     	//TODO: JTwigg: method stub
+    	saveStack.push(spm.save());
+    	getGame().getPhase().next(TilePhase.class);
+    	phaseLoop();
+    	
+    	getGame().getPhase().placeTile(move.getRotation(), move.getPosition());
+    	
+    	if( ! (getGame().getPhase() instanceof ActionPhase))
+    	{
+    		getGame().getPhase().next(ActionPhase.class);
+    	}
+    	if(move.getAction() != null)
+    	{
+    		assert move.getAction() instanceof MeepleAction;
+    		getGame().getPhase().deployMeeple(move.getActionPosition(), move.getActionLocation(), SmallFollower.class);
+    	}
     }
     
     private void undoMove()
     {
-    	//TODO: Jtwigg: method stub. Use a save point manager probably.
+    	spm.restore(saveStack.pop());
+    }
+    
+    protected void rankTilePlacement(Map<Position, Set<Rotation>> placements)
+    {
+    	moveSets.add(0, null);
+    	Collections.fill(moveSets,null);
+    	this.bestSoFar = getPossibleMoves(0).first();
     }
     
     protected TreeSet<PositionRanking> rankMoves(Map<Position, Set<Rotation>> placements) {
@@ -158,13 +193,15 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
                 //logger.info("  * placing {} {}", pos, rot);
                 getGame().getPhase().placeTile(rot, pos);
                 //logger.info("  * phase {} -> {}", getGame().getPhase(), getGame().getPhase().getDefaultNext());
-                
+                //getGame().getPhase().next();
                 phaseLoop();
                 double currRank = rank();
                 rankedPlacements.add(new PositionRanking(currRank, pos, rot));
-                if(currentPlayer.hasFollower())
+                if(getCurrentPlayer().hasFollower())
                 {
-                	Set<Location> locs = getGame().getBoard().get(pos).getUnoccupiedScoreables(false); 
+                	getGame().getPhase().next(ActionPhase.class);
+                    phaseLoop();
+                	Set<Location> locs = getGame().getBoard().get(pos).getUnoccupiedScoreables(true); 
                 	for(Location loc : locs)
                 	{
                 		SavePoint beforeMeepleSave = spm.save();
@@ -194,10 +231,37 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
         return rankedPlacements;
     }
     
-    private TreeSet<PositionRanking> getPossibleMoves()
+    public void selectAction(List<PlayerAction> actions, boolean canPass)
     {
-    	Map<Position, Set<Rotation>> placements = getGame().getBoard().getAvailablePlacements();
-    	return rankMoves(placements);
+    	PlayerAction action = actions.get(0);
+    	if(action instanceof TilePlacementAction)
+    	{
+    		selectTilePlacement((TilePlacementAction) action);
+    	}
+    	else
+    	{
+    		if(bestSoFar.getAction() != null)
+    		{
+    			((MeepleAction)bestSoFar.getAction()).perform(getServer(), bestSoFar.getActionPosition(), bestSoFar.getActionLocation());
+    		}
+    		else
+    		{
+    			getServer().pass();
+    		}
+    		cleanRanking();
+    	}
+    }
+    
+    private TreeSet<PositionRanking> getPossibleMoves(int depth)
+    {
+    	TreeSet<PositionRanking> moves = moveSets.get(depth);
+    	if(moves == null)
+    	{
+    		Map<Position, Set<Rotation>> placements = getGame().getBoard().getAvailablePlacements();
+    		moves = rankMoves(placements);
+    		moveSets.add(depth, moves);
+    	}
+    	return moves;
     }
     
     /*
@@ -215,7 +279,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	}
     	double score = Double.NEGATIVE_INFINITY;
     	
-    	for(PositionRanking ranking : getPossibleMoves())
+    	for(PositionRanking ranking : getPossibleMoves(depth))
     	{
     		doMove(ranking);
     		double value = -star25(alpha, beta, depth-1);
@@ -230,7 +294,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     private double nProbe(double alpha, double beta, int depth, int probingFactor)
     {
     	int i = 0;
-    	for(PositionRanking move : getPossibleMoves())
+    	for(PositionRanking move : getPossibleMoves(depth))
     	{    		
     			if(i++ >= probingFactor) break;
     			doMove(move);
@@ -287,7 +351,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     		cur_w += value;
     		if(value >= cur_beta)
     		{
-    			swapCurrentPlayer();
+    			endStar(depth);
     			return beta;
     		}
     		cur_x += probability*value;
@@ -307,19 +371,25 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     		replaceTile(tileId);
     		if (value >=cur_beta)
     		{
-    			swapCurrentPlayer();
+    			endStar(depth);
     			return beta;
     		}
     		if (value <= cur_alpha)
     		{
-    			swapCurrentPlayer();
+    			endStar(depth);
     			return alpha;
     		}
     		cur_x += probability * value;
     	}
     	
-    	swapCurrentPlayer();
+    	endStar(depth);
     	return cur_x;
 
+    }
+    
+    private void endStar(int depth)
+    {
+    	swapCurrentPlayer();
+    	moveSets.set(depth, null);
     }
 }

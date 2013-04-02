@@ -132,7 +132,7 @@ public class Server extends GameSettings implements ServerIF {
                 slot.setNick(null);
                 slot.setSerial(null);
             }
-            if (slot.getType() != SlotType.AI) { //new type
+            if(!PlayerSlot.isAi(slot.getType())) { //new type
                 slot.setAiClassName(null);
             }
         }

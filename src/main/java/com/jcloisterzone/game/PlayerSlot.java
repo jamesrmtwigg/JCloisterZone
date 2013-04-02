@@ -14,9 +14,10 @@ public class PlayerSlot implements Serializable {
 		switch (type) {
 			case AI:
 			case MM_AI:
-				return true
+				return true;
+			default:
+				return false;
 		}
-		return false;
 	}
 
 	private final int number;

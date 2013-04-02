@@ -37,7 +37,7 @@ public abstract class RankingAiPlayer extends AiPlayer {
     private SavePointManager spm;
 
     private Map<Feature, AiScoreContext> scoreCache = Maps.newHashMap();
-    private PositionRanking bestSoFar;
+    protected PositionRanking bestSoFar;
     //private List<PositionLocation> hopefulGatePlacements = new ArrayList<PositionLocation>();
 
     public Map<Feature, AiScoreContext> getScoreCache() {
@@ -214,7 +214,7 @@ public abstract class RankingAiPlayer extends AiPlayer {
         spm.restore(sp);
     }
 
-    private void cleanRanking() {
+    protected void cleanRanking() {
         bestSoFar = null;
         scoreCache.clear();
     }
