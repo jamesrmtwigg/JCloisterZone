@@ -86,10 +86,13 @@ public class MeepleLayer extends AbstractGridLayer {
         FigureTheme theme = getClient().getFigureTheme();
 
         Tile tile = gridPanel.getTile(m.getPosition());
-        ImmutablePoint offset = getMeeplePlacement(tile, m);
-        Image image = theme.getFigureImage(m.getClass(), c,  getExtraDecoration(m));
-        assert !images.containsKey(m);
-        images.put(m, new PositionedImage(m.getPosition(), offset, image));
+        if(tile != null)
+        {
+        	ImmutablePoint offset = getMeeplePlacement(tile, m);
+        	Image image = theme.getFigureImage(m.getClass(), c,  getExtraDecoration(m));
+        	assert !images.containsKey(m);
+        	images.put(m, new PositionedImage(m.getPosition(), offset, image));
+        }
     }
 
     public void meepleUndeployed(Meeple m) {

@@ -99,6 +99,7 @@ public class ResourcePlugin extends Plugin implements ResourceManager {
 
     @Override
     public ImmutablePoint getMeeplePlacement(Tile tile, Class<? extends Meeple> type, Feature piece) {
+    	if (tile == null) return null;//JTWIGG
         if (!containsTile(tile.getId())) return null;
         if (type.equals(Barn.class)) return null;
         return figurePositionProvider.getFigurePlacement(tile, piece.getClass(), piece.getLocation());

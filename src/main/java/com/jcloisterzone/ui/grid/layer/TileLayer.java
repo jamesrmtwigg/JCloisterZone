@@ -5,6 +5,7 @@ import java.awt.Image;
 import java.util.List;
 
 import com.google.common.collect.Lists;
+import com.jcloisterzone.board.Position;
 import com.jcloisterzone.board.Tile;
 import com.jcloisterzone.ui.grid.GridPanel;
 
@@ -21,8 +22,12 @@ public class TileLayer extends AbstractGridLayer {
     @Override
     public void paint(Graphics2D g2) {
         for(Tile tile : placedTiles) {
-            Image img = getClient().getResourceManager().getTileImage(tile);
-            g2.drawImage(img, getAffineTransform(img.getWidth(null), tile.getPosition(), tile.getRotation()), null);
+        	Position p = tile.getPosition();
+        	if(p != null)
+        	{
+        		Image img = getClient().getResourceManager().getTileImage(tile);
+        		g2.drawImage(img, getAffineTransform(img.getWidth(null), p, tile.getRotation()), null);
+        	}
         }
     }
 

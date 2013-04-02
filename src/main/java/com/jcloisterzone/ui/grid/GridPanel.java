@@ -335,8 +335,9 @@ public class GridPanel extends JPanel {
     // delegated UI methods
 
     public void tilePlaced(Tile tile, TileLayer tileLayer) {
-        Position p = tile.getPosition();
-
+        if(tile == null) return;
+    	Position p = tile.getPosition();
+        if(p == null) return;
         removeLayer(AbstractTilePlacementLayer.class);
         removeLayer(PlacementHistory.class);
 

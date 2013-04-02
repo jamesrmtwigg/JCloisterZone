@@ -2,11 +2,8 @@ package com.jcloisterzone.ai.mmplayer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -30,13 +27,11 @@ import com.jcloisterzone.board.Position;
 import com.jcloisterzone.board.Rotation;
 import com.jcloisterzone.board.Tile;
 import com.jcloisterzone.event.GameEventAdapter;
-import com.jcloisterzone.feature.score.ScoreAllCallback;
 import com.jcloisterzone.feature.score.ScoreAllFeatureFinder;
 import com.jcloisterzone.figure.SmallFollower;
 import com.jcloisterzone.game.Game;
 import com.jcloisterzone.game.Snapshot;
 import com.jcloisterzone.game.phase.ActionPhase;
-import com.jcloisterzone.game.phase.GameOverPhase;
 import com.jcloisterzone.game.phase.Phase;
 import com.jcloisterzone.game.phase.TilePhase;
 
@@ -49,12 +44,12 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
 	
 	private Stack<Game> gameStack = new Stack<Game>();
 	private Stack<SavePoint> saveStack = new Stack<SavePoint>();
+	private Stack<SavePointManager> spmStack = new Stack<SavePointManager>();
 	private Stack<PositionRanking> moveStack = new Stack<PositionRanking>();
-	private SavePointManager spm;
-	
+	private Stack<Tile> tileStack = new Stack<Tile>();
 	private Player currentPlayer = getPlayer();
 	
-	private ArrayList<TreeSet<PositionRanking>> moveSets = new ArrayList<TreeSet<PositionRanking>>(10);
+	//private ArrayList<TreeSet<PositionRanking>> moveSets = new ArrayList<TreeSet<PositionRanking>>(10);
 	
 	public static EnumSet<Expansion> supportedExpansions() {
         return EnumSet.of(
@@ -82,10 +77,10 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	getGame().setTurnPlayer(currentPlayer);
     }
     
-    public Game getGame()
+    /*public Game getGame()
     {
     	return gameStack.isEmpty() ? super.getGame() : gameStack.peek();
-    }
+    }*/
     
     private void backupGame()
     {
@@ -102,16 +97,36 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
         phase.startGame();
         setGame(gameCopy);
 
-        spm = new SavePointManager(getGame());
+        SavePointManager man = new SavePointManager(getGame());
+        spmStack.push(man);
+        man.startRecording();
         setBestSoFar(new PositionRanking(Double.NEGATIVE_INFINITY));
-        spm.startRecording();
+        
     }
     
     private void restoreGame() {
+        assert !spmStack.isEmpty();
+        SavePointManager man = spmStack.pop();
+        man.stopRecording();
         assert !gameStack.isEmpty();
-        spm.stopRecording();
-        spm = null;
         setGame(gameStack.pop());
+    }
+    
+    private void saveGame()
+    {
+    	saveStack.push(spmStack.peek().save());
+    }
+    
+    private void loadMostRecentSave(boolean pop)
+    {
+    	SavePoint sp = pop ? saveStack.pop() : saveStack.peek();
+    	spmStack.peek().restore(sp);
+    }
+    
+    protected double rank()
+    {
+    	double r = super.rank();
+    	return (currentPlayer == getPlayer()) ? r : -r;
     }
     
     private double rankLeaf()
@@ -121,15 +136,25 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
 		return callback.getRanking();
     }
     
-    private void setCurrentTile(String tileId)
+    private boolean setCurrentTile(String tileId)
     {
-    	getGame().setCurrentTile(getGame().getTilePack().drawTile(tileId));
+    	Tile tile = getGame().getTilePack().drawTile(tileId);
+    	if(tile == null)
+    	{
+    		return false;
+    	}
+    	tileStack.push(getGame().getCurrentTile());
+		getGame().setCurrentTile(tile);
+		return true;
     }
     
     private void replaceTile(String tileId)
     {
-    	Tile t = new Tile(tileId);
-    	((DefaultTilePack)getGame().getTilePack()).addTile(t, "default");
+    	//Tile t = new Tile(tileId);
+    	//((DefaultTilePack)getGame().getTilePack()).addTile(t, "default");
+    	((DefaultTilePack)getGame().getTilePack()).addTile(getGame().getCurrentTile(), "default");
+    	assert !tileStack.isEmpty();
+    	getGame().setCurrentTile(tileStack.pop());
     }
     
     private static String[] sortKeysByValueDescending(final Map<String, ArrayList<Tile>> map) {
@@ -162,11 +187,12 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	}
     	saveStack.push(spm.save());*/
     	backupGame();
+    	saveGame();
     	if(!(getGame().getPhase() instanceof TilePhase))
     	{
     		getGame().getPhase().next(TilePhase.class);
     	}
-    	phaseLoop();
+    	//phaseLoop();
     	
     	getGame().getPhase().placeTile(move.getRotation(), move.getPosition());
     	
@@ -184,7 +210,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     
     private void undoMove()
     {
-    	//spm.restore(saveStack.pop());
+    	loadMostRecentSave(true);
     	restoreGame();
     }
     
@@ -211,7 +237,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
         //logger.info("Positions: {} ", placements.keySet());
     	TreeSet<PositionRanking> rankedPlacements = new TreeSet<PositionRanking>();
         backupGame();
-        SavePoint sp = spm.save();
+        saveGame();
         for(Entry<Position, Set<Rotation>> entry : placements.entrySet()) {
             Position pos = entry.getKey();
             for(Rotation rot : entry.getValue()) {
@@ -234,7 +260,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
                 	Set<Location> locs = getGame().getBoard().get(pos).getUnoccupiedScoreables(true); 
                 	for(Location loc : locs)
                 	{
-                		SavePoint beforeMeepleSave = spm.save();
+                		saveGame();
                 		getGame().getPhase().deployMeeple(pos, loc, SmallFollower.class);
                 		phaseLoop();
                 		currRank = rank();
@@ -243,10 +269,10 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
                 		meepleRanking.setActionLocation(loc);
                 		meepleRanking.setActionPosition(pos);
                 		rankedPlacements.add(meepleRanking);
-                		spm.restore(beforeMeepleSave);
+                		loadMostRecentSave(true);
                 	}
                 }
-                spm.restore(sp);
+                loadMostRecentSave(false);
                 //TODO farin: fix hopefulGatePlacement
                 //now rank meeple placements - must restore because rank change game
                 //getGame().getPhase().placeTile(rot, pos);
@@ -256,8 +282,9 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
                 //getGame().getPhase().enter();
             }
         }
+        loadMostRecentSave(true);
         restoreGame();
-        logger.info("Selected move is: {}", rankedPlacements.first());
+        logger.info("Selected move is: {}", rankedPlacements.isEmpty() ? "None!" : rankedPlacements.first());
         return rankedPlacements;
     }
     
@@ -270,9 +297,9 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	}
     	else
     	{
-    		if(bestSoFar.getAction() != null)
+    		if(getBestSoFar().getAction() != null)
     		{
-    			((MeepleAction)bestSoFar.getAction()).perform(getServer(), bestSoFar.getActionPosition(), bestSoFar.getActionLocation());
+    			((MeepleAction)getBestSoFar().getAction()).perform(getServer(), getBestSoFar().getActionPosition(), getBestSoFar().getActionLocation());
     		}
     		else
     		{
@@ -376,7 +403,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     		cur_beta = (beta - LOWER_BOUND*cur_y - cur_x)/probability;
     		bx = Math.max(UPPER_BOUND, cur_beta);
     		//the next tile which we consider as a possibility to be drawn from the box.
-    		setCurrentTile(tileId);
+    		if(!setCurrentTile(tileId)) continue;
     		int probingFactor = 2;//TODO: jtwigg: choose the probing factor more intelligently?
     		value = nProbe(ax, bx, depth, probingFactor);
     		replaceTile(tileId);
@@ -399,7 +426,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     		cur_beta = (beta-cur_x-LOWER_BOUND*cur_y)/probability;
     		ax = Math.max(LOWER_BOUND, cur_alpha);
     		bx = Math.max(UPPER_BOUND, cur_beta);
-    		setCurrentTile(tileId);
+    		if(!setCurrentTile(tileId)) continue;
     		value = negamax(ax, bx, depth);
     		replaceTile(tileId);
     		if (value >=cur_beta)
@@ -424,7 +451,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     {
     	moveStack.pop();
     	swapCurrentPlayer();
-    	moveSets.set(depth, null);
+    	//moveSets.set(depth, null);
     }
     
     private PositionRanking getBestSoFar()
