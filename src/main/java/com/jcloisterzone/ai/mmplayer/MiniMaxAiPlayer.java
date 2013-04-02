@@ -39,11 +39,13 @@ import com.jcloisterzone.game.phase.TilePhase;
 public class MiniMaxAiPlayer extends LegacyAiPlayer
 {	
 	//TODO: Jtwigg: What are the upper and lower bounds on the rank function?
-	private static final double U = 100;
-	private static final double L = -100;
+	private static final double UPPER_BOUND = 100;
+	private static final double LOWER_BOUND = -100;
+	private static final int DEFAULT_MINIMAX_DEPTH = 5;
 	
 	private Stack<Game> gameStack = new Stack<Game>();
 	private Stack<SavePoint> saveStack = new Stack<SavePoint>();
+	private Stack<PositionRanking> moveStack = new Stack<PositionRanking>();
 	private SavePointManager spm;
 	
 	private Player currentPlayer = getPlayer();
@@ -97,7 +99,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
         setGame(gameCopy);
 
         spm = new SavePointManager(getGame());
-        bestSoFar = new PositionRanking(Double.NEGATIVE_INFINITY);
+        setBestSoFar(new PositionRanking(Double.NEGATIVE_INFINITY));
         spm.startRecording();
     }
     
@@ -150,7 +152,6 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     
     private void doMove(PositionRanking move)
     {
-    	//TODO: JTwigg: method stub
     	saveStack.push(spm.save());
     	getGame().getPhase().next(TilePhase.class);
     	phaseLoop();
@@ -173,11 +174,10 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	spm.restore(saveStack.pop());
     }
     
-    protected void rankTilePlacement(Map<Position, Set<Rotation>> placements)
-    {
-    	moveSets.add(0, null);
-    	Collections.fill(moveSets,null);
-    	this.bestSoFar = getPossibleMoves(0).first();
+    protected void selectTilePlacement(TilePlacementAction action) {
+        //Map<Position, Set<Rotation>> placements = action.getAvailablePlacements();
+        star25(UPPER_BOUND, LOWER_BOUND, DEFAULT_MINIMAX_DEPTH);
+        getServer().placeTile(getBestSoFar().getRotation(), getBestSoFar().getPosition());
     }
     
     protected TreeSet<PositionRanking> rankMoves(Map<Position, Set<Rotation>> placements) {
@@ -252,16 +252,10 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	}
     }
     
-    private TreeSet<PositionRanking> getPossibleMoves(int depth)
+    private TreeSet<PositionRanking> getPossibleMoves()
     {
-    	TreeSet<PositionRanking> moves = moveSets.get(depth);
-    	if(moves == null)
-    	{
-    		Map<Position, Set<Rotation>> placements = getGame().getBoard().getAvailablePlacements();
-    		moves = rankMoves(placements);
-    		moveSets.add(depth, moves);
-    	}
-    	return moves;
+    	Map<Position, Set<Rotation>> placements = getGame().getBoard().getAvailablePlacements();
+    	return rankMoves(placements);
     }
     
     /*
@@ -279,10 +273,11 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	}
     	double score = Double.NEGATIVE_INFINITY;
     	
-    	for(PositionRanking ranking : getPossibleMoves(depth))
+    	for(PositionRanking move : getPossibleMoves())
     	{
-    		doMove(ranking);
+    		doMove(move);
     		double value = -star25(alpha, beta, depth-1);
+    		if(getBestSoFar().getRank() < value) setBestSoFar(move);
     		undoMove();
     		if(value >= beta) return value;
     		if(value >= alpha) alpha = value;
@@ -294,11 +289,12 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     private double nProbe(double alpha, double beta, int depth, int probingFactor)
     {
     	int i = 0;
-    	for(PositionRanking move : getPossibleMoves(depth))
+    	for(PositionRanking move : getPossibleMoves())
     	{    		
     			if(i++ >= probingFactor) break;
     			doMove(move);
     			double value = -star25(-beta, -alpha, depth - 1);
+    			if(getBestSoFar().getRank() < value) setBestSoFar(move);
     			undoMove();
     			if(value >= beta) return beta;
     			if(value > alpha) alpha = value;
@@ -320,6 +316,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     		return rank();
     	}
     	
+    	moveStack.push(new PositionRanking(Double.NEGATIVE_INFINITY));
     	double cur_x = 0;
     	double cur_y = 1;
     	double cur_w = 0;
@@ -331,17 +328,17 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	Map<String, ArrayList<Tile>> tileTypes = getGame().getTilePack().getTilesRemaining();
     	String[] tileIDs = sortKeysByValueDescending(tileTypes);
     	double firstProb = (double)tileTypes.get(tileIDs[0]).size()/(double)packSize; 
-    	double cur_alpha = (alpha - (U*(1.0 - firstProb)))/firstProb;
+    	double cur_alpha = (alpha - (UPPER_BOUND*(1.0 - firstProb)))/firstProb;
     	
-    	double ax = Math.max(L, cur_alpha);
+    	double ax = Math.max(LOWER_BOUND, cur_alpha);
     	//probing phase
     	for(String tileId : tileIDs)
     	{
     		if(tileTypes.get(tileId).isEmpty()) break;
     		probability = (double)tileTypes.get(tileId).size()/(double)packSize;
     		cur_y -= probability;
-    		cur_beta = (beta - L*cur_y - cur_x)/probability;
-    		bx = Math.max(U, cur_beta);
+    		cur_beta = (beta - LOWER_BOUND*cur_y - cur_x)/probability;
+    		bx = Math.max(UPPER_BOUND, cur_beta);
     		//the next tile which we consider as a possibility to be drawn from the box.
     		setCurrentTile(tileId);
     		int probingFactor = 2;//TODO: jtwigg: choose the probing factor more intelligently?
@@ -363,9 +360,9 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     		probability = (double)tileTypes.get(tileId).size()/(double)packSize;
     		cur_y -= probability;
     		cur_alpha = (alpha-cur_x-cur_w)/probability;
-    		cur_beta = (beta-cur_x-L*cur_y)/probability;
-    		ax = Math.max(L, cur_alpha);
-    		bx = Math.max(U, cur_beta);
+    		cur_beta = (beta-cur_x-LOWER_BOUND*cur_y)/probability;
+    		ax = Math.max(LOWER_BOUND, cur_alpha);
+    		bx = Math.max(UPPER_BOUND, cur_beta);
     		setCurrentTile(tileId);
     		value = negamax(ax, bx, depth);
     		replaceTile(tileId);
@@ -389,7 +386,19 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     
     private void endStar(int depth)
     {
+    	moveStack.pop();
     	swapCurrentPlayer();
     	moveSets.set(depth, null);
+    }
+    
+    private PositionRanking getBestSoFar()
+    {
+    	return moveStack.peek();
+    }
+    
+    private void setBestSoFar(PositionRanking move)
+    {
+    	if( ! moveStack.isEmpty()) moveStack.pop();
+    	moveStack.push(move);
     }
 }
