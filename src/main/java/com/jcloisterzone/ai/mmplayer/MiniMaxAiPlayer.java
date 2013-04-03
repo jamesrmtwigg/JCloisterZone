@@ -40,14 +40,15 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
 	//TODO: Jtwigg: What are the upper and lower bounds on the rank function?
 	private static final double UPPER_BOUND = 100;
 	private static final double LOWER_BOUND = -100;
-	private static final int DEFAULT_MINIMAX_DEPTH = 2;
+	private static final int DEFAULT_MINIMAX_DEPTH = 1;
 	
 	private Stack<Game> gameStack = new Stack<Game>();
 	private Stack<SavePoint> saveStack = new Stack<SavePoint>();
 	private Stack<SavePointManager> spmStack = new Stack<SavePointManager>();
 	private Stack<PositionRanking> moveStack = new Stack<PositionRanking>();
 	private Stack<Tile> tileStack = new Stack<Tile>();
-	private Player currentPlayer = getPlayer();
+	private int currentPlayerIndex = 0;//getPlayer().getIndex();
+	private Player currentPlayer;
 	
 	//private ArrayList<TreeSet<PositionRanking>> moveSets = new ArrayList<TreeSet<PositionRanking>>(10);
 	
@@ -61,20 +62,20 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
 		throw new UnsupportedOperationException("This AI player supports only the basic game.");
 	}
    
-    private Player getCurrentPlayer()
+    /*private Player getCurrentPlayer()
     {
-    	if(this.currentPlayer == null)
+    	for(Player p : getGame().getAllPlayers())
     	{
-    		this.currentPlayer = getPlayer();
+    		if(p.getIndex() == currentPlayer.getIndex()) return p;
     	}
-    	return currentPlayer;
-    }
+    	return null;
+    }*/
     
     private void swapCurrentPlayer()
     {
-    	Player[] players = getGame().getAllPlayers();
-    	currentPlayer = (currentPlayer == players[0]) ? players[1] : players[0];
-    	getGame().setTurnPlayer(currentPlayer);
+ 		currentPlayerIndex ^= 1;
+   		currentPlayer = getGame().getAllPlayers()[currentPlayerIndex];
+   		getGame().setTurnPlayer(currentPlayer);
     }
     
     /*public Game getGame()
@@ -218,14 +219,23 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	restoreGame();
     }
     
-    protected void selectTilePlacement(TilePlacementAction action) {
+    protected void initVars()
+    {
+    	super.initVars();
+    	currentPlayer = getPlayer();
+    	currentPlayerIndex = currentPlayer.getIndex();
+    }
+    
+    protected void selectTilePlacement(TilePlacementAction action)
+    {
+    	initVars();
         TreeSet<PositionRanking> moves = getPossibleMoves(action);
         bestSoFar = new PositionRanking(Double.NEGATIVE_INFINITY);
         double best = Double.NEGATIVE_INFINITY;
         for(PositionRanking move : moves)
         {
         	doMove(move);
-        	double currRank = star25(UPPER_BOUND, LOWER_BOUND, DEFAULT_MINIMAX_DEPTH);
+        	double currRank = star25(LOWER_BOUND, UPPER_BOUND, DEFAULT_MINIMAX_DEPTH);
         	undoMove();
         	if(currRank > best)
         	{
@@ -257,7 +267,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
                 //phaseLoop();
                 double currRank = rank();
                 rankedPlacements.add(new PositionRanking(currRank, pos, rot));
-                if(getCurrentPlayer().hasFollower())
+                if(currentPlayer.hasFollower())
                 {
                 	getGame().getPhase().next(ActionPhase.class);
                     //phaseLoop();
@@ -294,6 +304,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     
     public void selectAction(List<PlayerAction> actions, boolean canPass)
     {
+    	initVars();
     	PlayerAction action = actions.get(0);
     	if(action instanceof TilePlacementAction)
     	{
