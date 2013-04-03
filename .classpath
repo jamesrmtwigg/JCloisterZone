@@ -16,6 +16,5 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/mina"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/slf4j"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/xnap"/>
-	<classpathentry kind="lib" path="/Users/jtwigg/Documents/JCloister_Complete/gettext-commons-0.9.6.jar"/>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>

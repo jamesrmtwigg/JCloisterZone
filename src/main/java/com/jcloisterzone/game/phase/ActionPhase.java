@@ -150,7 +150,7 @@ public class ActionPhase extends Phase {
     @Override
     public void deployMeeple(Position p, Location loc, Class<? extends Meeple> meepleType) {
         Meeple m = getActivePlayer().getUndeployedMeeple(meepleType);
-        m.deploy(getBoard().get(p), loc);
+        if(m != null) m.deploy(getBoard().get(p), loc);
         next();
     }
 

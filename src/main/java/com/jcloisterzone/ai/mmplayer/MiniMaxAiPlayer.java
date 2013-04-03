@@ -41,6 +41,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
 	private static final double UPPER_BOUND = 100;
 	private static final double LOWER_BOUND = -100;
 	private static final int DEFAULT_MINIMAX_DEPTH = 1;
+	private static final int MAX_MOVES_PER_PLY = 10;
 	
 	private Stack<Game> gameStack = new Stack<Game>();
 	private Stack<SavePoint> saveStack = new Stack<SavePoint>();
@@ -267,7 +268,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
                 //phaseLoop();
                 double currRank = rank();
                 rankedPlacements.add(new PositionRanking(currRank, pos, rot));
-                if(currentPlayer.hasFollower())
+                if(getGame().getPhase().getActivePlayer().hasFollower())
                 {
                 	getGame().getPhase().next(ActionPhase.class);
                     //phaseLoop();
@@ -283,6 +284,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
                 		meepleRanking.setActionLocation(loc);
                 		meepleRanking.setActionPosition(pos);
                 		rankedPlacements.add(meepleRanking);
+                		if(rankedPlacements.size() > MAX_MOVES_PER_PLY) rankedPlacements.pollLast();
                 		loadMostRecentSave(true);
                 	}
                 }
@@ -309,6 +311,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	if(action instanceof TilePlacementAction)
     	{
     		selectTilePlacement((TilePlacementAction) action);
+    		logger.info("Final decision: {}", bestSoFar);
     	}
     	else
     	{
