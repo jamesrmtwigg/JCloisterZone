@@ -40,7 +40,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
 	//TODO: Jtwigg: What are the upper and lower bounds on the rank function?
 	private static final double UPPER_BOUND = 100;
 	private static final double LOWER_BOUND = -100;
-	private static final int DEFAULT_MINIMAX_DEPTH = 5;
+	private static final int DEFAULT_MINIMAX_DEPTH = 2;
 	
 	private Stack<Game> gameStack = new Stack<Game>();
 	private Stack<SavePoint> saveStack = new Stack<SavePoint>();
@@ -98,6 +98,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
         DefaultTilePack copyPack = (DefaultTilePack) gameCopy.getTilePack();
         copyPack.addTile(gameCopy.getCurrentTile(), "default");
         gameCopy.setCurrentTile(copyPack.drawTile(getGame().getCurrentTile().getId()));
+        gameCopy.getBoard().refreshAvailablePlacements(gameCopy.getCurrentTile());
         setGame(gameCopy);
 
         SavePointManager man = new SavePointManager(getGame());
@@ -232,7 +233,7 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
         		bestSoFar = move;
         	}
         }
-        getServer().placeTile(getBestSoFar().getRotation(), getBestSoFar().getPosition());
+        getServer().placeTile(bestSoFar.getRotation(), bestSoFar.getPosition());
     }
     
     protected TreeSet<PositionRanking> rankMoves(Map<Position, Set<Rotation>> placements) {
@@ -253,19 +254,19 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
                 getGame().getPhase().placeTile(rot, pos);
                 //logger.info("  * phase {} -> {}", getGame().getPhase(), getGame().getPhase().getDefaultNext());
                 //getGame().getPhase().next();
-                phaseLoop();
+                //phaseLoop();
                 double currRank = rank();
                 rankedPlacements.add(new PositionRanking(currRank, pos, rot));
                 if(getCurrentPlayer().hasFollower())
                 {
                 	getGame().getPhase().next(ActionPhase.class);
-                    phaseLoop();
+                    //phaseLoop();
                 	Set<Location> locs = getGame().getBoard().get(pos).getUnoccupiedScoreables(true); 
                 	for(Location loc : locs)
                 	{
                 		saveGame();
                 		getGame().getPhase().deployMeeple(pos, loc, SmallFollower.class);
-                		phaseLoop();
+                		//phaseLoop();
                 		currRank = rank();
                 		PositionRanking meepleRanking = new PositionRanking(currRank, pos, rot);
                 		meepleRanking.setAction(new MeepleAction(SmallFollower.class, pos, locs));
@@ -300,9 +301,9 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
     	}
     	else
     	{
-    		if(getBestSoFar().getAction() != null)
+    		if(bestSoFar.getAction() != null)
     		{
-    			((MeepleAction)getBestSoFar().getAction()).perform(getServer(), getBestSoFar().getActionPosition(), getBestSoFar().getActionLocation());
+    			((MeepleAction)bestSoFar.getAction()).perform(getServer(), bestSoFar.getActionPosition(), bestSoFar.getActionLocation());
     		}
     		else
     		{
