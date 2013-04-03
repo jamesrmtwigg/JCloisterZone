@@ -95,6 +95,9 @@ public class MiniMaxAiPlayer extends LegacyAiPlayer
         gameCopy.getPhases().put(phase.getClass(), phase);
         gameCopy.setPhase(phase);
         phase.startGame();
+        DefaultTilePack copyPack = (DefaultTilePack) gameCopy.getTilePack();
+        copyPack.addTile(gameCopy.getCurrentTile(), "default");
+        gameCopy.setCurrentTile(copyPack.drawTile(getGame().getCurrentTile().getId()));
         setGame(gameCopy);
 
         SavePointManager man = new SavePointManager(getGame());
